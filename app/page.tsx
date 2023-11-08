@@ -1,113 +1,137 @@
-import Image from 'next/image'
+"use client"
+import { ChangeEvent, useState, FormEvent } from "react"
+// Create Intial UI
+// Create file upload logic (uploading an image, base64 string)
+// Create the API route logic (POST api/analyzeImage, openai logic)
+// Handle the streaming of data to our frontend (when you see chatGPT talk block by block)
+// Discussion / where to go from here.
 
 export default function Home() {
+  const [ image, setImage ] = useState<string>("");
+  const [ openAIResponse, setOpenAIResponse ] = useState<string>("");
+  // useState to hold a base64 string.
+  // useState to hold the chatGPT response
+
+  // Image upload logic
+  // 1. User upload an image
+  // 2. We can take the image (all of its data), and convert it into a base64 string
+  // What is a base64 string? It is a string "AJADLSDJAK" that represents an ENTIRE image.
+  // "ENTIRESTRING" -> :)
+  // 3. When we request the API route we create, we will pass the image (string) to the backend.
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    if(event.target.files === null) {
+      window.alert("No file selected. Choose a file.")
+      return;
+    }
+    const file = event.target.files[0];
+
+    // Convert the users file (locally on their computer) to a base64 string
+    // FileReader
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+
+    reader.onload = () => {
+      // reader.result -> base64 string ("ENTIRESTRING" -> :))
+      if(typeof reader.result === "string") {
+        console.log(reader.result);
+        setImage(reader.result);
+      }
+    }
+
+    reader.onerror = (error) => {
+      console.log("error: " + error);
+    }
+
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if(image === "") {
+      alert("Upload an image.")
+      return;
+    }
+
+    // POST api/analyzeImage
+    await fetch("api/analyzeImage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        image: image // base64 image
+      })
+    })
+    .then(async (response: any) => {
+      // Because we are getting a streaming text response
+      // we have to make some logic to handle the streaming text
+      const reader = response.body?.getReader();
+      setOpenAIResponse("");
+      // reader allows us to read a new piece of info on each "read"
+      // "Hello" + "I am" + "Cooper Codes"  reader.read();
+      while (true) {
+        const { done, value } = await reader?.read();
+        // done is true once the response is done
+        if(done) {
+          break;
+        }
+
+        // value : uint8array -> a string.
+        var currentChunk = new TextDecoder().decode(value);
+        setOpenAIResponse((prev) => prev + currentChunk);
+      }
+    });
+
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+    <div className="min-h-screen flex items-center justify-center text-md">
+      <div className='bg-slate-800 w-full max-w-2xl rounded-lg shadow-md p-8'>
+        <h2 className='text-xl font-bold mb-4'>Uploaded Image</h2>
+        { image !== "" ?
+          <div className="mb-4 overflow-hidden">
+            <img 
+              src={image}
+              className="w-full object-contain max-h-72"
             />
-          </a>
+          </div>
+        :
+        <div className="mb-4 p-8 text-center">
+          <p>Once you upload an image, you will see it here.</p>
         </div>
+        }
+        
+
+        <form onSubmit={(e) => handleSubmit(e)}>
+          <div className='flex flex-col mb-6'>
+            <label className='mb-2 text-sm font-medium'>Upload Image</label>
+            <input
+              type="file"
+              className="text-sm border rounded-lg cursor-pointer"
+              onChange={(e) => handleFileChange(e)}
+            />
+          </div>
+          
+          <div className='flex justify-center'>
+            <button type="submit" className='p-2 bg-sky-600 rounded-md mb-4'>
+              Ask ChatGPT To Analyze Your Image
+            </button>
+          </div> 
+
+        </form>
+
+        {openAIResponse !== "" ?
+        <div className="border-t border-gray-300 pt-4">
+          <h2 className="text-xl font-bold mb-2">AI Response</h2>
+          <p>{openAIResponse}</p>
+        </div>
+        :
+        null
+        }
+        
+
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
   )
 }
